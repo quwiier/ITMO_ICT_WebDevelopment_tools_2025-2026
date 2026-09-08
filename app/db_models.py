@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Column, DateTime
+from sqlalchemy import Column, DateTime, text
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.schemas import Currency, OperationKind
@@ -13,7 +13,7 @@ class TransactionTagLink(SQLModel, table=True):
     """Many-to-many link with the moment a tag was applied."""
     transaction_id: int | None = Field(default=None, foreign_key="transaction.id", primary_key=True)
     tag_id: int | None = Field(default=None, foreign_key="tag.id", primary_key=True)
-    applied_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=False), nullable=False))
+    applied_at: datetime = Field(sa_column=Column(DateTime(timezone=False), nullable=False, server_default=text("CURRENT_TIMESTAMP")))
 
 
 class User(SQLModel, table=True):

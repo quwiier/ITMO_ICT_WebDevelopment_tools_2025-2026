@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Currency(str, Enum):
@@ -29,6 +29,7 @@ class AccountCreate(AccountBase):
 
 
 class AccountRead(AccountBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
 
 
@@ -39,6 +40,7 @@ class CategoryBase(BaseModel):
 
 
 class CategoryRead(CategoryBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
 
 
@@ -52,6 +54,7 @@ class TagCreate(TagBase):
 
 
 class TagRead(TagBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
 
 
@@ -84,3 +87,38 @@ class TransactionRead(BaseModel):
     account: AccountRead
     category: CategoryRead
     tags: list[TagRead]
+
+
+class UserCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    full_name: str = Field(min_length=1, max_length=100)
+
+
+class UserRead(BaseModel):
+    id: int
+    email: str
+    full_name: str
+
+
+class AccountDbCreate(AccountBase):
+    user_id: int
+
+
+class CategoryDbCreate(CategoryBase):
+    user_id: int
+
+
+class TagDbCreate(TagBase):
+    user_id: int
+
+
+class BudgetCreate(BaseModel):
+    user_id: int
+    category_id: int
+    amount_limit: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    period_start: date
+    period_end: date
+
+
+class BudgetRead(BudgetCreate):
+    id: int

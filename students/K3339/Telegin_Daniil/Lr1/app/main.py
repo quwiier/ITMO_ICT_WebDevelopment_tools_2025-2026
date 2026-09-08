@@ -1,5 +1,6 @@
 """FastAPI application backed by PostgreSQL through SQLModel."""
 
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -28,6 +29,7 @@ from app.schemas import (
     TransactionCreate,
     TransactionRead,
     TransactionUpdate,
+    OperationKind,
     RegisterRequest,
     UserCreate,
     UserRead,
@@ -90,6 +92,11 @@ def validate_transaction_references(session: Session, account_id: int, category_
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="One or more tags not found")
     return account, category, [tag for tag in tags if tag is not None]
 
+
+def update_account_balance(account: Account, amount: Decimal, kind: OperationKind, reverse: bool = False) -> None:
+    """Apply or reverse a transaction effect on an account balance."""
+    change = amount if kind == OperationKind.INCOME else -amount
+    account.balance += -change if reverse else change
 
 @app.get("/", tags=["service"])
 def read_root() -> dict[str, str]:
@@ -227,6 +234,8 @@ def get_transaction(transaction_id: int, session: SessionDep) -> TransactionRead
 def create_transaction(payload: TransactionCreate, session: SessionDep) -> TransactionRead:
     account, category, tags = validate_transaction_references(session, payload.account_id, payload.category_id, payload.tag_ids)
     transaction = Transaction(amount=payload.amount, kind=payload.kind, operation_date=payload.operation_date, description=payload.description, account=account, category=category, tags=tags)
+    update_account_balance(account, transaction.amount, transaction.kind)
+    session.add(account)
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
@@ -238,6 +247,8 @@ def update_transaction(transaction_id: int, payload: TransactionUpdate, session:
     transaction = session.get(Transaction, transaction_id)
     if transaction is None:
         raise not_found("Transaction")
+    previous_account = transaction.account
+    update_account_balance(previous_account, transaction.amount, transaction.kind, reverse=True)
     changes = payload.model_dump(exclude_unset=True)
     if "account_id" in changes or "category_id" in changes or "tag_ids" in changes:
         account_id = changes.pop("account_id", transaction.account_id)
@@ -249,6 +260,9 @@ def update_transaction(transaction_id: int, payload: TransactionUpdate, session:
         transaction.tags = tags
     for field, value in changes.items():
         setattr(transaction, field, value)
+    update_account_balance(transaction.account, transaction.amount, transaction.kind)
+    session.add(previous_account)
+    session.add(transaction.account)
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
@@ -260,6 +274,8 @@ def delete_transaction(transaction_id: int, session: SessionDep) -> None:
     transaction = session.get(Transaction, transaction_id)
     if transaction is None:
         raise not_found("Transaction")
+    update_account_balance(transaction.account, transaction.amount, transaction.kind, reverse=True)
+    session.add(transaction.account)
     session.delete(transaction)
     session.commit()
 

@@ -3,22 +3,32 @@
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.db_models import Account, Budget, Category, Tag, Transaction, User
+from app.security import create_access_token, decode_access_token, hash_password, verify_password
 from app.schemas import (
     AccountDbCreate,
     AccountRead,
+    AccountUpdate,
     BudgetCreate,
     BudgetRead,
+    BudgetUpdate,
+    ChangePasswordRequest,
     CategoryDbCreate,
     CategoryRead,
+    CategoryUpdate,
+    AccessToken,
+    LoginRequest,
     TagDbCreate,
     TagRead,
+    TagUpdate,
     TransactionCreate,
     TransactionRead,
     TransactionUpdate,
+    RegisterRequest,
     UserCreate,
     UserRead,
 )
@@ -30,6 +40,7 @@ app = FastAPI(
     version="0.2.0",
 )
 SessionDep = Annotated[Session, Depends(get_session)]
+bearer_scheme = HTTPBearer()
 
 
 def not_found(resource: str) -> HTTPException:
@@ -42,6 +53,17 @@ def get_user(session: Session, user_id: int) -> User:
         raise not_found("User")
     return user
 
+
+def get_current_user(credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)], session: SessionDep) -> User:
+    """Return the user encoded in a valid Bearer JWT."""
+    try:
+        user_id = decode_access_token(credentials.credentials)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)) from error
+    return get_user(session, user_id)
+
+
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 def serialize_transaction(transaction: Transaction) -> TransactionRead:
     return TransactionRead(
@@ -73,6 +95,44 @@ def validate_transaction_references(session: Session, account_id: int, category_
 def read_root() -> dict[str, str]:
     return {"message": "Personal Finance Service is running"}
 
+
+@app.post("/auth/register", response_model=UserRead, status_code=status.HTTP_201_CREATED, tags=["authentication"])
+def register(payload: RegisterRequest, session: SessionDep) -> User:
+    """Register a user and store only a bcrypt password hash."""
+    existing = session.exec(select(User).where(User.email == payload.email)).first()
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already registered")
+    user = User(email=payload.email, full_name=payload.full_name, password_hash=hash_password(payload.password))
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+@app.post("/auth/login", response_model=AccessToken, tags=["authentication"])
+def login(payload: LoginRequest, session: SessionDep) -> AccessToken:
+    """Authenticate with a password and issue a manually created HS256 JWT."""
+    user = session.exec(select(User).where(User.email == payload.email)).first()
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+    return AccessToken(access_token=create_access_token(user.id))
+
+
+@app.get("/auth/me", response_model=UserRead, tags=["authentication"])
+def read_current_user(current_user: CurrentUserDep) -> User:
+    """Return the authenticated user profile."""
+    return current_user
+
+
+@app.post("/auth/change-password", tags=["authentication"])
+def change_password(payload: ChangePasswordRequest, current_user: CurrentUserDep, session: SessionDep) -> dict[str, str]:
+    """Verify the current password and replace its bcrypt hash."""
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    current_user.password_hash = hash_password(payload.new_password)
+    session.add(current_user)
+    session.commit()
+    return {"message": "Password updated"}
 
 @app.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED, tags=["users"])
 def create_user(payload: UserCreate, session: SessionDep) -> User:
@@ -201,4 +261,109 @@ def delete_transaction(transaction_id: int, session: SessionDep) -> None:
     if transaction is None:
         raise not_found("Transaction")
     session.delete(transaction)
+    session.commit()
+
+
+def apply_changes(model: object, changes: dict[str, object]) -> None:
+    for field, value in changes.items():
+        setattr(model, field, value)
+
+
+@app.get("/accounts/{account_id}", response_model=AccountRead, tags=["accounts"])
+def get_account(account_id: int, session: SessionDep) -> Account:
+    account = session.get(Account, account_id)
+    if account is None:
+        raise not_found("Account")
+    return account
+
+
+@app.patch("/accounts/{account_id}", response_model=AccountRead, tags=["accounts"])
+def update_account(account_id: int, payload: AccountUpdate, session: SessionDep) -> Account:
+    account = get_account(account_id, session)
+    apply_changes(account, payload.model_dump(exclude_unset=True))
+    session.add(account)
+    session.commit()
+    session.refresh(account)
+    return account
+
+
+@app.delete("/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["accounts"])
+def delete_account(account_id: int, session: SessionDep) -> None:
+    account = get_account(account_id, session)
+    session.delete(account)
+    session.commit()
+
+
+@app.get("/categories/{category_id}", response_model=CategoryRead, tags=["categories"])
+def get_category(category_id: int, session: SessionDep) -> Category:
+    category = session.get(Category, category_id)
+    if category is None:
+        raise not_found("Category")
+    return category
+
+
+@app.patch("/categories/{category_id}", response_model=CategoryRead, tags=["categories"])
+def update_category(category_id: int, payload: CategoryUpdate, session: SessionDep) -> Category:
+    category = get_category(category_id, session)
+    apply_changes(category, payload.model_dump(exclude_unset=True))
+    session.add(category)
+    session.commit()
+    session.refresh(category)
+    return category
+
+
+@app.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["categories"])
+def delete_category(category_id: int, session: SessionDep) -> None:
+    category = get_category(category_id, session)
+    session.delete(category)
+    session.commit()
+
+
+@app.get("/tags/{tag_id}", response_model=TagRead, tags=["tags"])
+def get_tag(tag_id: int, session: SessionDep) -> Tag:
+    tag = session.get(Tag, tag_id)
+    if tag is None:
+        raise not_found("Tag")
+    return tag
+
+
+@app.patch("/tags/{tag_id}", response_model=TagRead, tags=["tags"])
+def update_tag(tag_id: int, payload: TagUpdate, session: SessionDep) -> Tag:
+    tag = get_tag(tag_id, session)
+    apply_changes(tag, payload.model_dump(exclude_unset=True))
+    session.add(tag)
+    session.commit()
+    session.refresh(tag)
+    return tag
+
+
+@app.delete("/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["tags"])
+def delete_tag(tag_id: int, session: SessionDep) -> None:
+    tag = get_tag(tag_id, session)
+    session.delete(tag)
+    session.commit()
+
+
+@app.get("/budgets/{budget_id}", response_model=BudgetRead, tags=["budgets"])
+def get_budget(budget_id: int, session: SessionDep) -> Budget:
+    budget = session.get(Budget, budget_id)
+    if budget is None:
+        raise not_found("Budget")
+    return budget
+
+
+@app.patch("/budgets/{budget_id}", response_model=BudgetRead, tags=["budgets"])
+def update_budget(budget_id: int, payload: BudgetUpdate, session: SessionDep) -> Budget:
+    budget = get_budget(budget_id, session)
+    apply_changes(budget, payload.model_dump(exclude_unset=True))
+    session.add(budget)
+    session.commit()
+    session.refresh(budget)
+    return budget
+
+
+@app.delete("/budgets/{budget_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["budgets"])
+def delete_budget(budget_id: int, session: SessionDep) -> None:
+    budget = get_budget(budget_id, session)
+    session.delete(budget)
     session.commit()

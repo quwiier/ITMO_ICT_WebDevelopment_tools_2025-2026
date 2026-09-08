@@ -122,3 +122,44 @@ class BudgetCreate(BaseModel):
 
 class BudgetRead(BudgetCreate):
     id: int
+
+class RegisterRequest(UserCreate):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=8, max_length=128)
+
+
+class AccessToken(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class AccountUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    balance: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
+    currency: Currency | None = None
+
+
+class CategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    kind: OperationKind | None = None
+    color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class TagUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class BudgetUpdate(BaseModel):
+    amount_limit: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
+    period_start: date | None = None
+    period_end: date | None = None

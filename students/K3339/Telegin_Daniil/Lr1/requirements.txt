@@ -1,0 +1,9 @@
+fastapi[standard]
+pydantic
+sqlmodel
+psycopg2-binary
+python-dotenv
+alembic
+bcrypt
+mkdocs
+mkdocs-material

@@ -134,9 +134,9 @@ python -m task2_parser.benchmark --workers 4 --repeats 3
 
 | Подход | Воркеров | Среднее время, с | Сумма верна |
 | --- | ---: | ---: | --- |
-| `threading` | 4 | _заполняется по CSV_ | да |
-| `multiprocessing` | 4 | _заполняется по CSV_ | да |
-| `asyncio` | 4 | _заполняется по CSV_ | да |
+| `threading` | 4 | 0,000785 | да |
+| `multiprocessing` | 4 | 0,171613 | да |
+| `asyncio` | 4 | 0,000096 | да |
 
 ### Задача 2
 

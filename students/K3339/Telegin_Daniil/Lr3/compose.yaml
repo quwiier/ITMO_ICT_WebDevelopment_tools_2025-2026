@@ -34,13 +34,43 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://finance_user:finance_password@db:5432/personal_finance
       PARSER_SERVICE_URL: http://parser:8001
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
       db:
         condition: service_healthy
       parser:
         condition: service_started
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ../../../..
+      dockerfile: students/K3339/Telegin_Daniil/Lr3/docker/api.Dockerfile
+    command: celery -A tasks.celery_app worker --loglevel=INFO
+    environment:
+      DATABASE_URL: postgresql+psycopg2://finance_user:finance_password@db:5432/personal_finance
+      PARSER_SERVICE_URL: http://parser:8001
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      parser:
+        condition: service_started
+      redis:
+        condition: service_healthy
 
 volumes:
   lr3_postgres_data:

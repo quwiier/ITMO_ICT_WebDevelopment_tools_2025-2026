@@ -10,6 +10,8 @@ COPY students/K3339/Telegin_Daniil/Lr1/alembic.ini ./alembic.ini
 COPY students/K3339/Telegin_Daniil/Lr1/migrations ./migrations
 COPY students/K3339/Telegin_Daniil/Lr1/app ./app
 COPY students/K3339/Telegin_Daniil/Lr3/lr3_api.py ./lr3_api.py
+COPY students/K3339/Telegin_Daniil/Lr3/celery_app.py ./celery_app.py
+COPY students/K3339/Telegin_Daniil/Lr3/tasks.py ./tasks.py
 
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn lr3_api:app --host 0.0.0.0 --port 8000"]

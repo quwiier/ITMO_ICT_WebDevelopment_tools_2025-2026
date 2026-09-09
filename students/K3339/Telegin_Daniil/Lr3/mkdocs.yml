@@ -1,0 +1,7 @@
+site_name: ЛР3 — Docker, источники данных и очереди
+site_description: Отчёт по лабораторной работе 3
+theme:
+  name: material
+nav:
+  - Главная: index.md
+  - Лабораторная работа 3: lr3.md

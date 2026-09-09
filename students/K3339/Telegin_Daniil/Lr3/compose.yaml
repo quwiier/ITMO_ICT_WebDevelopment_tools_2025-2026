@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: personal_finance
+      POSTGRES_USER: finance_user
+      POSTGRES_PASSWORD: finance_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - lr3_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance_user -d personal_finance"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  parser:
+    build:
+      context: ../../../..
+      dockerfile: students/K3339/Telegin_Daniil/Lr3/docker/parser.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://finance_user:finance_password@db:5432/personal_finance
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+
+  api:
+    build:
+      context: ../../../..
+      dockerfile: students/K3339/Telegin_Daniil/Lr3/docker/api.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://finance_user:finance_password@db:5432/personal_finance
+      PARSER_SERVICE_URL: http://parser:8001
+    depends_on:
+      db:
+        condition: service_healthy
+      parser:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+volumes:
+  lr3_postgres_data:

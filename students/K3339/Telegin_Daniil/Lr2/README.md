@@ -25,3 +25,31 @@ pip install -r requirements.txt
 
 Команды запуска и результаты будут добавляться по мере реализации задач.
 
+## Запуск
+
+Запускать команды следует из папки `Lr2` после активации окружения.
+
+```powershell
+# Задача 1: три отдельных подхода
+python -m task1_sum.threading_sum --save
+python -m task1_sum.multiprocessing_sum --save
+python -m task1_sum.asyncio_sum --save
+
+# Единый замер задачи 1, три повтора
+python -m task1_sum.benchmark --repeats 3
+
+# Задача 2: перед этим запустить PostgreSQL из ЛР1
+python -m task2_parser.threading_parser
+python -m task2_parser.multiprocessing_parser
+python -m task2_parser.asyncio_parser
+
+# Единый замер задачи 2, три повтора
+python -m task2_parser.benchmark --repeats 3
+```
+
+Для быстрого пробного запуска можно ограничить диапазон и список URL:
+
+```powershell
+python -m task1_sum.benchmark --limit 100000 --workers 2 --repeats 1
+python -m task2_parser.benchmark --url https://example.com --workers 1 --repeats 1
+```

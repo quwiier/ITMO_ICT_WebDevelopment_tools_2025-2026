@@ -1,0 +1,7 @@
+site_name: ЛР2 — потоки, процессы и асинхронность
+site_description: Отчёт по лабораторной работе 2
+theme:
+  name: material
+nav:
+  - Главная: index.md
+  - Лабораторная работа 2: lr2.md

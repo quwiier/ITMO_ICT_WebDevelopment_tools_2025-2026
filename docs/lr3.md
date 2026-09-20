@@ -1,0 +1,1 @@
+--8<-- "students/K3339/Telegin_Daniil/Lr3/docs/lr3.md"

@@ -11,6 +11,6 @@ markdown_extensions:
       check_paths: true
 nav:
   - Главная: index.md
-  - Лабораторная работа 1: lr1.md
-  - Лабораторная работа 2: lr2.md
-  - Лабораторная работа 3: lr3.md
+  - Лабораторная работа 1: labs/lr1.md
+  - Лабораторная работа 2: labs/lr2.md
+  - Лабораторная работа 3: labs/lr3.md
